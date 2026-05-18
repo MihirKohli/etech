@@ -11,9 +11,10 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    GROQ_API_KEY: str = ""
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
-    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    OPENAI_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_TEMPERATURE: float = 0.3
+
     CHROMA_PERSIST_DIR: str = "./data/chroma_db"
     CHROMA_COLLECTION: str = "rag_documents"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/rag.db"

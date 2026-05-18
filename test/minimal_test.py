@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from models import Base
+from db.models import Base
 from services.session_management import (
     create_session, get_session, add_message,
     get_recent_messages, save_memory, get_user_memories,

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from models import Session, Message, ConversationMemory
+from db.models import Session, Message, ConversationMemory
 
 
 async def create_session(db: AsyncSession, user_id: str) -> Session:
