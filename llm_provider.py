@@ -7,11 +7,9 @@ by extending the if/elif chain.
 
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
-
 from config import get_settings
 
-
-def get_llm() -> BaseChatModel:
+def get_openai_llm() -> BaseChatModel:
     settings = get_settings()
     return ChatOpenAI(
         model=settings.LLM_MODEL,

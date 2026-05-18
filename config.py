@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o-mini"
     LLM_TEMPERATURE: float = 0.3
 
+    EMBEDDING_MODEL: str = "text-embedding-ada-002"
     CHROMA_PERSIST_DIR: str = "./data/chroma_db"
     CHROMA_COLLECTION: str = "rag_documents"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/rag.db"
