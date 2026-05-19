@@ -1,10 +1,7 @@
 import os
 import shutil
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from services.document_ingestion import ingest_document
-from db.sql_database import get_db
-from services.session_management import get_user_memories
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
  
@@ -38,17 +35,3 @@ async def upload_document(file: UploadFile = File(...)):
     }
  
  
-# ── Memories ─────────────────────────────────────────
- 
-@router.get("/memories/{user_id}")
-async def get_memories(user_id: str, db: AsyncSession = Depends(get_db)):
-    memories = await get_user_memories(db, user_id)
-    return [
-        {
-            "memory_type": m.memory_type,
-            "content": m.content,
-            "importance": m.importance,
-            "created_at": m.created_at,
-        }
-        for m in memories
-    ]

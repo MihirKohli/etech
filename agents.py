@@ -3,9 +3,14 @@ Query Understanding Agent — classifies user intent and decides
 whether conversation history or document retrieval is needed.
 """
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langgraph")
+warnings.filterwarnings("ignore", message=".*allowed_objects.*")
+
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.graph import StateGraph, END
 from llm import get_openai_llm
-from schemas import AgentState, QueryIntent, RetrievalStrategy, SourceInfo
+from schema import AgentState, QueryIntent, RetrievalStrategy, SourceInfo
 from db.vector_database import search
 
 
@@ -362,3 +367,44 @@ def extract_memories(user_msg: str, assistant_msg: str) -> list[dict]:
                     current = {}
 
     return memories
+
+
+# ── LangGraph Pipeline ───────────────────────────────────────────────────────
+
+def _build_graph() -> StateGraph:
+    graph = StateGraph(AgentState)
+
+    graph.add_node("query_understanding", query_understanding_agent)
+    graph.add_node("query_rewriting", query_rewriting_agent)
+    graph.add_node("retrieval_router", retrieval_router_agent)
+    graph.add_node("retrieval", retrieval_node)
+    graph.add_node("context_synthesis", context_synthesis_agent)
+
+    graph.set_entry_point("query_understanding")
+    graph.add_edge("query_understanding", "query_rewriting")
+    graph.add_edge("query_rewriting", "retrieval_router")
+    graph.add_edge("retrieval_router", "retrieval")
+    graph.add_edge("retrieval", "context_synthesis")
+    graph.add_edge("context_synthesis", END)
+
+    return graph.compile()
+
+
+_pipeline = _build_graph()
+
+
+def run_pipeline(
+    session_id: str,
+    user_id: str,
+    query: str,
+    conversation_history: list[dict],
+    conversation_summary: str = "",
+) -> dict:
+    initial_state: AgentState = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "original_query": query,
+        "conversation_history": conversation_history,
+        "conversation_summary": conversation_summary,
+    }
+    return _pipeline.invoke(initial_state)

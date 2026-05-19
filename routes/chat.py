@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from agents import run_pipeline,summarize_conversation, extract_memories
-from schemas import ChatRequest, ChatResponse, SourceInfo
+from schema import ChatRequest, ChatResponse, SourceInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 from services.session_management import (
     get_session, add_message,

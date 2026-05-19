@@ -1,9 +1,8 @@
 from fastapi import Depends, HTTPException, APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.sql_database import get_db
-from services.session_management import (
-    create_session, get_session, list_sessions
-)
+from services.session_management import create_session, get_session, list_sessions
+
 
 router = APIRouter()
 
