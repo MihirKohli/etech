@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from agents import run_pipeline,summarize_conversation, extract_memories
-from schema import ChatRequest, ChatResponse, SourceInfo
+from llm.agents import run_pipeline,summarize_conversation, extract_memories
+from llm.schema import ChatRequest, ChatResponse, SourceInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 from services.session_management import (
     get_session, add_message,
@@ -9,7 +9,6 @@ from services.session_management import (
 )
 from db.sql_database import get_db
 from config import get_settings
-
 
 router = APIRouter()
 

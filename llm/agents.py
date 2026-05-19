@@ -9,8 +9,8 @@ warnings.filterwarnings("ignore", message=".*allowed_objects.*")
 
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
-from llm import get_openai_llm
-from schema import AgentState, QueryIntent, RetrievalStrategy, SourceInfo
+from llm.llm import get_openai_llm
+from llm.schema import AgentState, QueryIntent, RetrievalStrategy, SourceInfo
 from db.vector_database import search
 
 
@@ -371,7 +371,7 @@ def extract_memories(user_msg: str, assistant_msg: str) -> list[dict]:
 
 # ── LangGraph Pipeline ───────────────────────────────────────────────────────
 
-def _build_graph() -> StateGraph:
+def build_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
     graph.add_node("query_understanding", query_understanding_agent)
@@ -390,7 +390,7 @@ def _build_graph() -> StateGraph:
     return graph.compile()
 
 
-_pipeline = _build_graph()
+pipeline = build_graph()
 
 
 def run_pipeline(
@@ -407,4 +407,4 @@ def run_pipeline(
         "conversation_history": conversation_history,
         "conversation_summary": conversation_summary,
     }
-    return _pipeline.invoke(initial_state)
+    return pipeline.invoke(initial_state)
