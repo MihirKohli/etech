@@ -16,6 +16,7 @@ embeddings: OpenAIEmbeddings | None = None
 
 
 def get_embeddings() -> OpenAIEmbeddings:
+    global embeddings
     if embeddings is None:
         embeddings = OpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL,
@@ -25,6 +26,7 @@ def get_embeddings() -> OpenAIEmbeddings:
 
 
 def get_collection() -> chromadb.Collection:
+    global collection, client
     if collection is None:
         client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIR)
         collection = client.get_or_create_collection(

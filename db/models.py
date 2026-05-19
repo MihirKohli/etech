@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
 class Session(Base):
     __tablename__ = "sessions"
 
-    id = Column(String, primary_key=True, default= uuid7().hex)
+    id = Column(String, primary_key=True, default=lambda: uuid7().hex)
     user_id = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, default= datetime.now())
     summary = Column(Text, default="")
@@ -21,7 +21,7 @@ class Session(Base):
 class Message(Base):
     __tablename__ = "messages"
 
-    id = Column(String, primary_key=True, default= uuid7().hex)
+    id = Column(String, primary_key=True, default=lambda: uuid7().hex)
     session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
     role = Column(String, nullable=False)       # "user" | "assistant"
     content = Column(Text, nullable=False)
@@ -33,7 +33,7 @@ class ConversationMemory(Base):
     """Cross-session long-term memory per user."""
     __tablename__ = "conversation_memory"
 
-    id = Column(String, primary_key=True, default= uuid7().hex)
+    id = Column(String, primary_key=True, default=lambda: uuid7().hex)
     user_id = Column(String, nullable=False, index=True)
     memory_type = Column(String, nullable=False)   # "preference" | "fact" | "summary"
     content = Column(Text, nullable=False)

@@ -16,3 +16,5 @@ def get_openai_llm() -> BaseChatModel:
         temperature=settings.LLM_TEMPERATURE,
         api_key=settings.OPENAI_API_KEY,
     )
+
+
