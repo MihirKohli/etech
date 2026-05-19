@@ -92,6 +92,78 @@ streamlit run streamlit_ui.py
 - API docs: http://localhost:8000/docs
 - Chat UI: http://localhost:8501
 
+## Docker
+
+The project ships with a `Dockerfile` and a `docker-compose.yml` that spins up four services:
+
+| Service | Container | Port | Description |
+|---|---|---|---|
+| `api` | `etech-api` | `8080` | FastAPI backend |
+| `streamlit` | `etech-streamlit` | `8501` | Streamlit UI |
+| `chroma` | `etech-chroma` | `8001` | ChromaDB vector store |
+| `postgres` | `etech-postgres` | `5432` | PostgreSQL (replaces SQLite) |
+
+### 1. Configure
+
+```bash
+cp .env.example .env
+# Set OPENAI_API_KEY in .env
+```
+
+### 2. Build and start all services
+
+```bash
+docker compose up --build
+```
+
+- API docs: http://localhost:8080/docs
+- Chat UI: http://localhost:8501
+- ChromaDB: http://localhost:8001
+
+### 3. Stop services
+
+```bash
+docker compose down
+```
+
+To also remove persistent volumes (wipes all data):
+
+```bash
+docker compose down -v
+```
+
+### Running only the backing services (local dev)
+
+If you want to run the API and Streamlit locally but use containerised Chroma and Postgres:
+
+```bash
+docker compose up chroma postgres
+```
+
+Then run the app locally, pointing at the containers:
+
+```bash
+CHROMA_HOST=localhost CHROMA_PORT=8001 \
+DATABASE_URL=postgresql+asyncpg://rag:rag@localhost:5432/ragdb \
+uvicorn main:app --reload --port 8080
+```
+
+### Volumes
+
+| Volume | Purpose |
+|---|---|
+| `chroma_data` | ChromaDB persistence |
+| `pg_data` | PostgreSQL data |
+| `upload_data` | Uploaded documents (`/app/data/uploads`) |
+
+### Notes
+
+- The `api` and `streamlit` services are built from the same `Dockerfile`; they differ only in their `command`.
+- The `api` service overrides `DATABASE_URL` and `CHROMA_HOST`/`CHROMA_PORT` at runtime — values in `.env` are used for everything else (e.g. `OPENAI_API_KEY`).
+- The `streamlit` service sets `API_URL=http://api:8080` so it reaches the API over the internal Docker network.
+
+---
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
