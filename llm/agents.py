@@ -2,6 +2,7 @@
 LangGraph RAG pipeline agents.
 """
 
+import logging
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="langgraph")
 warnings.filterwarnings("ignore", message=".*allowed_objects.*")
@@ -11,6 +12,8 @@ from langgraph.graph import StateGraph, END
 from llm.llm import get_openai_llm
 from llm.schema import AgentState, QueryIntent, RetrievalStrategy, SourceInfo
 from db.vector_database import search, keyword_search
+
+logger = logging.getLogger(__name__)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -341,4 +344,28 @@ async def run_pipeline(
         "conversation_history": conversation_history,
         "conversation_summary": conversation_summary,
     }
-    return await pipeline.ainvoke(initial_state)
+
+    final_state = {}
+    async for event in pipeline.astream_events(initial_state, version="v2"):
+        kind = event["event"]
+        name = event.get("name", "")
+
+        if kind == "on_chain_start" and name in {
+            "query_understanding", "query_rewriting", "retrieval_router",
+            "semantic_retrieval", "hybrid_retrieval", "memory_only", "context_synthesis",
+        }:
+            logger.info(f"[node:start]  {name}")
+
+        elif kind == "on_chain_end" and name in {
+            "query_understanding", "query_rewriting", "retrieval_router",
+            "semantic_retrieval", "hybrid_retrieval", "memory_only", "context_synthesis",
+        }:
+            logger.info(f"[node:end]    {name}")
+            if name == "retrieval_router":
+                strategy = event.get("data", {}).get("output", {}).get("retrieval_strategy", "")
+                logger.info(f"[edge]        retrieval_router → {strategy}")
+
+        elif kind == "on_chain_end" and name == "LangGraph":
+            final_state = event.get("data", {}).get("output", {})
+
+    return final_state

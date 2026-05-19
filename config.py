@@ -11,7 +11,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    OPENAI_API_KEY: str = "OPENAI_API_KEY_HERE"
+    OPENAI_API_KEY: str
     LLM_MODEL: str = "gpt-4o-mini"
     LLM_TEMPERATURE: float = 0.3
 
