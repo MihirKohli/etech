@@ -1,7 +1,10 @@
 import json
-from sqlalchemy import select
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Session, Message, ConversationMemory, AgentTrace
+from config import get_settings
+
+_settings = get_settings()
 
 
 async def create_session(db: AsyncSession, user_id: str) -> Session:
@@ -63,9 +66,40 @@ async def get_recent_messages(db: AsyncSession, session_id: str, limit: int = 10
 
 
 async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str):
+    # Skip exact duplicates
+    existing = await db.execute(
+        select(ConversationMemory).where(
+            ConversationMemory.user_id == user_id,
+            ConversationMemory.memory_type == memory_type,
+            ConversationMemory.content == content,
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        return None
+
     mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content)
     db.add(mem)
     await db.commit()
+
+    # Prune oldest entries beyond MEMORY_MAX_ENTRIES per user
+    count_result = await db.execute(
+        select(func.count()).where(ConversationMemory.user_id == user_id)
+    )
+    total = count_result.scalar()
+    if total > _settings.MEMORY_MAX_ENTRIES:
+        overflow = total - _settings.MEMORY_MAX_ENTRIES
+        oldest_ids_result = await db.execute(
+            select(ConversationMemory.id)
+            .where(ConversationMemory.user_id == user_id)
+            .order_by(ConversationMemory.created_at.asc())
+            .limit(overflow)
+        )
+        oldest_ids = [row[0] for row in oldest_ids_result]
+        await db.execute(
+            delete(ConversationMemory).where(ConversationMemory.id.in_(oldest_ids))
+        )
+        await db.commit()
+
     return mem
 
 

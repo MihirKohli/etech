@@ -149,7 +149,7 @@ async def hybrid_retrieval_node(state: AgentState) -> dict:
     session_id = state["session_id"]
 
     semantic_results = await search(query, session_id=session_id, top_k=7)
-    keyword_results = keyword_search(query, session_id=session_id, top_k=7)
+    keyword_results = await keyword_search(query, session_id=session_id, top_k=7)
 
     # Merge by chunk_id, semantic score wins on conflict
     merged: dict[str, dict] = {}
@@ -203,7 +203,7 @@ Example:
     merged: dict[str, dict] = {}
     for sq in sub_questions:
         sem = await search(sq, session_id=session_id, top_k=5)
-        kw = keyword_search(sq, session_id=session_id, top_k=5)
+        kw = await keyword_search(sq, session_id=session_id, top_k=5)
         for r in kw:
             merged.setdefault(r["chunk_id"], r)
         for r in sem:
@@ -486,5 +486,5 @@ async def stream_pipeline(
         "retrieval_strategy": final_state.get("retrieval_strategy"),
         "rewritten_query": final_state.get("rewritten_query"),
         "sub_questions": final_state.get("sub_questions"),
-        "agent_trace": final_state.get("agent_trace"),
+        # "agent_trace": final_state.get("agent_trace"),
     }

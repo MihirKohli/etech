@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     CHROMA_PERSIST_DIR: str = "./data/chroma_db"
     CHROMA_COLLECTION: str = "rag_documents"
+    CHROMA_HOST: str = ""        # set to "chroma" in Docker; empty = use local PersistentClient
+    CHROMA_PORT: int = 8001
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/rag.db"
     API_URL: str = "http://localhost:8000"
 
@@ -25,6 +27,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 20
     SUMMARY_TRIGGER_TURNS: int = 10
     MEMORY_WINDOW_SIZE: int = 5
+    MEMORY_MAX_ENTRIES: int = 50   # max long-term memories kept per user; oldest pruned beyond this
 
     model_config = {"env_file": ".env"}
 

@@ -70,10 +70,10 @@ class ChatResponse(BaseModel):
     session_id: str
     answer: str
     sources: list[SourceInfo] = []
-    agent_trace: list[str] = Field(
-        default_factory=list,
-        description="Ordered list of agents that processed this query",
-    )
+    # agent_trace: list[str] = Field(
+    #     default_factory=list,
+    #     description="Ordered list of agents that processed this query",
+    # )
 
 
 class SourceInfo(BaseModel):
@@ -177,4 +177,4 @@ class AgentState(TypedDict, total=False):
     sub_questions: list[str]
 
     # ── Trace / observability ────────────────────────────
-    agent_trace: list[str]
+    # agent_trace: list[str]

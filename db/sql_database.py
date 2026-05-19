@@ -2,7 +2,6 @@
 from config import get_settings
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from db.models import Base
-# ── Engine setup ─────────────────────────────────────
 
 settings = get_settings()
 

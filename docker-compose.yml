@@ -1,15 +1,51 @@
 
 services:
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: ragdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d ragdb"]
+      interval: 10s
+      retries: 5
+
   api:
     build: .
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - DATABASE_URL=postgresql+asyncpg://rag:rag@postgres:5432/ragdb
     volumes:
-      - chroma_data:/app/data/chroma_db
       - upload_data:/app/data/uploads
-      - sqlite_data:/app/data
+    depends_on:
+      chroma:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -28,22 +64,7 @@ services:
     environment:
       - API_URL=http://api:8000
 
-  # Optional: swap SQLite for PostgreSQL
-  # Uncomment below and set DATABASE_URL=postgresql+asyncpg://rag:rag@postgres:5432/ragdb in .env
-  #
-  # postgres:
-  #   image: postgres:15-alpine
-  #   environment:
-  #     POSTGRES_USER: rag
-  #     POSTGRES_PASSWORD: rag
-  #     POSTGRES_DB: ragdb
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - pg_data:/var/lib/postgresql/data
-
 volumes:
   chroma_data:
   upload_data:
-  sqlite_data:
-  # pg_data:
+  pg_data:

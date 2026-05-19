@@ -9,7 +9,7 @@ from services.session_management import (
     get_session, add_message,
     get_recent_messages, save_memory,
     update_session_summary,
-    save_agent_trace, get_session_traces,
+    # save_agent_trace, get_session_traces,
 )
 from db.sql_database import get_db
 from config import get_settings
@@ -17,25 +17,24 @@ from config import get_settings
 router = APIRouter()
 
 
-
 # ── Chat ─────────────────────────────────────────────
- 
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
     settings = get_settings()
- 
+
     # Validate session
     session = await get_session(db, req.session_id)
     if not session:
         raise HTTPException(404, "Session not found")
- 
+
     # Save user message
     await add_message(db, req.session_id, "user", req.message)
- 
+
     # Load recent history
     recent = await get_recent_messages(db, req.session_id, limit=settings.MEMORY_WINDOW_SIZE * 2)
     history = [{"role": m.role, "content": m.content} for m in recent]
- 
+
     # Run the LangGraph pipeline
     _t0 = time.perf_counter()
     result = await run_pipeline(
@@ -46,38 +45,38 @@ async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
         conversation_summary=session.summary or "",
     )
     response_time_ms = (time.perf_counter() - _t0) * 1000
- 
+
     answer = result.get("answer", "I couldn't generate a response.")
- 
+
     # Save assistant message
     await add_message(db, req.session_id, "assistant", answer)
- 
+
     # Refresh session to get updated turn count
     session = await get_session(db, req.session_id)
- 
+
     # Summarize if turn threshold reached
     if session.turn_count > 0 and session.turn_count % settings.SUMMARY_TRIGGER_TURNS == 0:
         all_msgs = await get_recent_messages(db, req.session_id, limit=30)
         msg_dicts = [{"role": m.role, "content": m.content} for m in all_msgs]
         summary = await summarize_conversation(msg_dicts, session.summary or "")
         await update_session_summary(db, req.session_id, summary)
- 
+
     # Extract memories (runs on every exchange, lightweight)
     memories = await extract_memories(req.message, answer)
     for mem in memories:
         await save_memory(db, session.user_id, mem["memory_type"], mem["content"])
 
     # Save agent trace for explainability
-    await save_agent_trace(
-        db,
-        session_id=req.session_id,
-        query_intent=str(result.get("query_intent", "")),
-        retrieval_strategy=str(result.get("retrieval_strategy", "")),
-        rewritten_query=result.get("rewritten_query"),
-        sub_questions=result.get("sub_questions"),
-        nodes_visited=result.get("agent_trace"),
-        response_time_ms=response_time_ms,
-    )
+    # await save_agent_trace(
+    #     db,
+    #     session_id=req.session_id,
+    #     query_intent=str(result.get("query_intent", "")),
+    #     retrieval_strategy=str(result.get("retrieval_strategy", "")),
+    #     rewritten_query=result.get("rewritten_query"),
+    #     sub_questions=result.get("sub_questions"),
+    #     nodes_visited=result.get("agent_trace"),
+    #     response_time_ms=response_time_ms,
+    # )
 
     # Build response
     sources = [
@@ -88,7 +87,7 @@ async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
         )
         for s in result.get("sources", [])
     ]
- 
+
     return ChatResponse(
         session_id=req.session_id,
         answer=answer,
@@ -154,41 +153,41 @@ async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)):
             await save_memory(db, session.user_id, mem["memory_type"], mem["content"])
 
         # Save agent trace
-        await save_agent_trace(
-            db,
-            session_id=req.session_id,
-            query_intent=str(done_meta.get("query_intent", "")),
-            retrieval_strategy=str(done_meta.get("retrieval_strategy", "")),
-            rewritten_query=done_meta.get("rewritten_query"),
-            sub_questions=done_meta.get("sub_questions"),
-            nodes_visited=done_meta.get("agent_trace"),
-            response_time_ms=response_time_ms,
-        )
+        # await save_agent_trace(
+        #     db,
+        #     session_id=req.session_id,
+        #     query_intent=str(done_meta.get("query_intent", "")),
+        #     retrieval_strategy=str(done_meta.get("retrieval_strategy", "")),
+        #     rewritten_query=done_meta.get("rewritten_query"),
+        #     sub_questions=done_meta.get("sub_questions"),
+        #     nodes_visited=done_meta.get("agent_trace"),
+        #     response_time_ms=response_time_ms,
+        # )
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.get("/chat/trace/{session_id}")
-async def get_trace(session_id: str, db: AsyncSession = Depends(get_db)):
-    """
-    Returns the agent decision log for a session — intent, retrieval strategy,
-    rewritten query, and sub-questions for each turn.
-    """
-    session = await get_session(db, session_id)
-    if not session:
-        raise HTTPException(404, "Session not found")
-
-    traces = await get_session_traces(db, session_id)
-    return [
-        {
-            "turn": i + 1,
-            "query_intent": t.query_intent,
-            "retrieval_strategy": t.retrieval_strategy,
-            "rewritten_query": t.rewritten_query,
-            "sub_questions": json.loads(t.sub_questions or "[]"),
-            "nodes_visited": json.loads(t.nodes_visited or "[]"),
-            "response_time_ms": t.response_time_ms,
-            "created_at": t.created_at,
-        }
-        for i, t in enumerate(reversed(traces))
-    ]
+# @router.get("/chat/trace/{session_id}")
+# async def get_trace(session_id: str, db: AsyncSession = Depends(get_db)):
+#     """
+#     Returns the agent decision log for a session — intent, retrieval strategy,
+#     rewritten query, and sub-questions for each turn.
+#     """
+#     session = await get_session(db, session_id)
+#     if not session:
+#         raise HTTPException(404, "Session not found")
+#
+#     traces = await get_session_traces(db, session_id)
+#     return [
+#         {
+#             "turn": i + 1,
+#             "query_intent": t.query_intent,
+#             "retrieval_strategy": t.retrieval_strategy,
+#             "rewritten_query": t.rewritten_query,
+#             "sub_questions": json.loads(t.sub_questions or "[]"),
+#             "nodes_visited": json.loads(t.nodes_visited or "[]"),
+#             "response_time_ms": t.response_time_ms,
+#             "created_at": t.created_at,
+#         }
+#         for i, t in enumerate(reversed(traces))
+#     ]

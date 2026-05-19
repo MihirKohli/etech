@@ -6,8 +6,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
-from routes.health import router as health_router
 from db.sql_database import init_db
+from routes.health import router as health_router
 from routes.session import router as session_router
 from routes.chat import router as chat_router
 from routes.document import router as document_router
