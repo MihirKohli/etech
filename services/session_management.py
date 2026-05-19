@@ -3,6 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Session, Message, ConversationMemory
 
 
+async def list_sessions(db: AsyncSession, user_id: str) -> list[Session]:
+    result = await db.execute(
+        select(Session).where(Session.user_id == user_id).order_by(Session.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 async def create_session(db: AsyncSession, user_id: str) -> Session:
     session = Session(user_id=user_id)
     db.add(session)
