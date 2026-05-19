@@ -10,9 +10,9 @@ Run all:           pytest tests/test_module3.py -v
 import pytest
 from unittest.mock import patch, MagicMock
 
-from schema import AgentState, QueryIntent, RetrievalStrategy
-from agents import retrieval_router_agent
-from agents import route_after_understanding, route_after_router
+from llm.schema import AgentState, QueryIntent, RetrievalStrategy
+from llm.agents import retrieval_router_agent
+from llm.agents import route_after_understanding, route_after_router
 
 
 # ── Retrieval Router (no LLM, pure logic) ────────────
@@ -70,7 +70,7 @@ def test_query_understanding_mocked():
 
     with patch("app.agents.query_understanding.get_llm", return_value=mock_llm):
         with patch("app.agents.query_understanding.PROMPT.__or__", return_value=mock_chain):
-            from agents import query_understanding_agent
+            from llm.agents import query_understanding_agent
             state: AgentState = {
                 "original_query": "What is FastAPI?",
                 "conversation_summary": "",
@@ -88,7 +88,7 @@ def test_query_understanding_mocked():
 )
 def test_integration_full_pipeline():
     """Run the full pipeline with real LLM. Needs ingested docs."""
-    from orchestrator import run_pipeline
+    from llm.orchestrator import run_pipeline
 
     result = run_pipeline(
         session_id="test_session",
