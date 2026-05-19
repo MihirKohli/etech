@@ -41,11 +41,23 @@ def get_collection(session_id: str) -> chromadb.Collection:
     return _collections[session_id]
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
-    return get_embeddings().embed_documents(texts)
+# def embed_texts(texts: list[str]) -> list[list[float]]:
+#     return get_embeddings().embed_documents(texts)
+async def embed_texts(texts: list[str]) -> list[list[float]]:
+    return await get_embeddings().aembed_documents(texts)
 
 
-def add_chunks(chunks: list[dict], session_id: str) -> int:
+# def add_chunks(chunks: list[dict], session_id: str) -> int:
+#     if not chunks:
+#         return 0
+#     collection = get_collection(session_id)
+#     ids = [c["chunk_id"] for c in chunks]
+#     documents = [c["content"] for c in chunks]
+#     metadatas = [c["metadata"] for c in chunks]
+#     embeddings = embed_texts(documents)
+#     collection.add(ids=ids, documents=documents, metadatas=metadatas, embeddings=embeddings)
+#     return len(chunks)
+async def add_chunks(chunks: list[dict], session_id: str) -> int:
     if not chunks:
         return 0
 
@@ -53,7 +65,7 @@ def add_chunks(chunks: list[dict], session_id: str) -> int:
     ids = [c["chunk_id"] for c in chunks]
     documents = [c["content"] for c in chunks]
     metadatas = [c["metadata"] for c in chunks]
-    embeddings = embed_texts(documents)
+    embeddings = await embed_texts(documents)
 
     collection.add(
         ids=ids,
@@ -64,9 +76,17 @@ def add_chunks(chunks: list[dict], session_id: str) -> int:
     return len(chunks)
 
 
-def search(query: str, session_id: str, top_k: int = 5) -> list[dict]:
+# def search(query: str, session_id: str, top_k: int = 5) -> list[dict]:
+#     collection = get_collection(session_id)
+#     query_embedding = get_embeddings().embed_query(query)
+#     results = collection.query(query_embeddings=[query_embedding], n_results=top_k,
+#                                include=["documents", "metadatas", "distances"])
+#     return [{"chunk_id": results["ids"][0][i], "content": results["documents"][0][i],
+#              "metadata": results["metadatas"][0][i],
+#              "score": 1 - results["distances"][0][i]} for i in range(len(results["ids"][0]))]
+async def search(query: str, session_id: str, top_k: int = 5) -> list[dict]:
     collection = get_collection(session_id)
-    query_embedding = get_embeddings().embed_query(query)
+    query_embedding = await get_embeddings().aembed_query(query)
 
     results = collection.query(
         query_embeddings=[query_embedding],

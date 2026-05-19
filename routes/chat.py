@@ -33,7 +33,7 @@ async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
     history = [{"role": m.role, "content": m.content} for m in recent]
  
     # Run the LangGraph pipeline
-    result = run_pipeline(
+    result = await run_pipeline(
         session_id=req.session_id,
         user_id=session.user_id,
         query=req.message,
@@ -53,11 +53,11 @@ async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
     if session.turn_count > 0 and session.turn_count % settings.SUMMARY_TRIGGER_TURNS == 0:
         all_msgs = await get_recent_messages(db, req.session_id, limit=30)
         msg_dicts = [{"role": m.role, "content": m.content} for m in all_msgs]
-        summary = summarize_conversation(msg_dicts, session.summary or "")
+        summary = await summarize_conversation(msg_dicts, session.summary or "")
         await update_session_summary(db, req.session_id, summary)
  
     # Extract memories (runs on every exchange, lightweight)
-    memories = extract_memories(req.message, answer)
+    memories = await extract_memories(req.message, answer)
     for mem in memories:
         await save_memory(db, session.user_id, mem["memory_type"], mem["content"])
  

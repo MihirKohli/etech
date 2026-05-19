@@ -8,7 +8,8 @@ from services.document_chunker import chunk_document
 from db.vector_database import add_chunks
 
 
-def ingest_document(filepath: str, session_id: str) -> dict:
+# def ingest_document(filepath: str, session_id: str) -> dict:
+async def ingest_document(filepath: str, session_id: str) -> dict:
     """
     Ingest a single document file into the vector store.
 
@@ -25,7 +26,7 @@ def ingest_document(filepath: str, session_id: str) -> dict:
     chunks = chunk_document(docs, document_id=document_id)
 
     # 3. Embed & store
-    count = add_chunks(chunks, session_id=session_id)
+    count = await add_chunks(chunks, session_id=session_id)
 
     return {
         "document_id": document_id,

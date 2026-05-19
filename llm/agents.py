@@ -36,7 +36,8 @@ def format_context(chunks: list[dict]) -> str:
 
 # ── Agents ───────────────────────────────────────────────────────────────────
 
-def query_understanding_agent(state: AgentState) -> dict:
+# def query_understanding_agent(state: AgentState) -> dict:
+async def query_understanding_agent(state: AgentState) -> dict:
     PROMPT = ChatPromptTemplate.from_messages([
         ("system", """Classify the user query into exactly one intent and decide what's needed.
 
@@ -55,7 +56,8 @@ Conversation summary so far: {summary}"""),
         ("human", "{query}"),
     ])
     llm = get_openai_llm()
-    response = (PROMPT | llm).invoke({
+    # response = (PROMPT | llm).invoke({...})
+    response = await (PROMPT | llm).ainvoke({
         "query": state["original_query"],
         "summary": state.get("conversation_summary", "No prior conversation."),
     })
@@ -89,7 +91,8 @@ Conversation summary so far: {summary}"""),
     }
 
 
-def query_rewriting_agent(state: AgentState) -> dict:
+# def query_rewriting_agent(state: AgentState) -> dict:
+async def query_rewriting_agent(state: AgentState) -> dict:
     if not state.get("needs_history", False):
         return {"rewritten_query": state["original_query"]}
 
@@ -107,7 +110,8 @@ Conversation history:
         ("human", "{query}"),
     ])
     llm = get_openai_llm()
-    response = (PROMPT | llm).invoke({
+    # response = (PROMPT | llm).invoke({...})
+    response = await (PROMPT | llm).ainvoke({
         "query": state["original_query"],
         "history": format_history(state.get("conversation_history", [])),
     })
@@ -115,7 +119,8 @@ Conversation history:
     return {"rewritten_query": rewritten or state["original_query"]}
 
 
-def retrieval_router_agent(state: AgentState) -> dict:
+# def retrieval_router_agent(state: AgentState) -> dict:
+async def retrieval_router_agent(state: AgentState) -> dict:
     intent = state.get("query_intent", QueryIntent.FACTUAL)
 
     if not state.get("needs_retrieval", True):
@@ -127,14 +132,16 @@ def retrieval_router_agent(state: AgentState) -> dict:
     return {"retrieval_strategy": RetrievalStrategy.SEMANTIC}
 
 
-def retrieval_node(state: AgentState) -> dict:
+# def retrieval_node(state: AgentState) -> dict:
+async def retrieval_node(state: AgentState) -> dict:
     strategy = state.get("retrieval_strategy", RetrievalStrategy.SEMANTIC)
     if strategy == RetrievalStrategy.MEMORY_ONLY:
         return {"retrieved_chunks": []}
 
     query = state.get("rewritten_query", state["original_query"])
     top_k = 7 if strategy == RetrievalStrategy.HYBRID else 5
-    results = search(query, session_id=state["session_id"], top_k=top_k)
+    # results = search(query, session_id=state["session_id"], top_k=top_k)
+    results = await search(query, session_id=state["session_id"], top_k=top_k)
 
     chunks = [
         {
@@ -148,7 +155,8 @@ def retrieval_node(state: AgentState) -> dict:
     return {"retrieved_chunks": chunks}
 
 
-def context_synthesis_agent(state: AgentState) -> dict:
+# def context_synthesis_agent(state: AgentState) -> dict:
+async def context_synthesis_agent(state: AgentState) -> dict:
     PROMPT = ChatPromptTemplate.from_messages([
         ("system", """You are a helpful technical assistant. Answer the user's question
 using ONLY the provided context. If the context doesn't contain the answer, say so.
@@ -168,7 +176,8 @@ Conversation history:
     ])
     llm = get_openai_llm()
     chunks = state.get("retrieved_chunks", [])
-    response = (PROMPT | llm).invoke({
+    # response = (PROMPT | llm).invoke({...})
+    response = await (PROMPT | llm).ainvoke({
         "query": state.get("rewritten_query", state["original_query"]),
         "context": format_context(chunks),
         "history": format_history(state.get("conversation_history", []), limit=4),
@@ -189,7 +198,8 @@ Conversation history:
     }
 
 
-def summarize_conversation(messages: list[dict], existing_summary: str = "") -> str:
+# def summarize_conversation(messages: list[dict], existing_summary: str = "") -> str:
+async def summarize_conversation(messages: list[dict], existing_summary: str = "") -> str:
     """Takes message dicts and returns a summary string."""
     if not messages:
         return existing_summary
@@ -207,14 +217,16 @@ Existing summary (if any): {existing_summary}"""),
         f"{m.get('role', 'user')}: {m.get('content', '')}"
         for m in messages
     )
-    response = (PROMPT | llm).invoke({
+    # response = (PROMPT | llm).invoke({...})
+    response = await (PROMPT | llm).ainvoke({
         "existing_summary": existing_summary or "None",
         "conversation": conversation_text,
     })
     return response.content.strip()
 
 
-def extract_memories(user_msg: str, assistant_msg: str) -> list[dict]:
+# def extract_memories(user_msg: str, assistant_msg: str) -> list[dict]:
+async def extract_memories(user_msg: str, assistant_msg: str) -> list[dict]:
     """Returns list of {memory_type, content} dicts to store."""
     PROMPT = ChatPromptTemplate.from_messages([
         ("system", """Extract any important user preferences or facts from this exchange
@@ -235,7 +247,8 @@ Only extract genuinely useful long-term information. Skip transient questions.""
         ("human", "User said: {user_msg}\nAssistant replied: {assistant_msg}"),
     ])
     llm = get_openai_llm()
-    response = (PROMPT | llm).invoke({
+    # response = (PROMPT | llm).invoke({...})
+    response = await (PROMPT | llm).ainvoke({
         "user_msg": user_msg,
         "assistant_msg": assistant_msg,
     })
@@ -287,7 +300,9 @@ def build_graph() -> StateGraph:
 pipeline = build_graph()
 
 
-def run_pipeline(
+# def run_pipeline(...) -> dict:
+#     return pipeline.invoke(initial_state)
+async def run_pipeline(
     session_id: str,
     user_id: str,
     query: str,
@@ -301,4 +316,4 @@ def run_pipeline(
         "conversation_history": conversation_history,
         "conversation_summary": conversation_summary,
     }
-    return pipeline.invoke(initial_state)
+    return await pipeline.ainvoke(initial_state)

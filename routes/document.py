@@ -23,7 +23,7 @@ async def upload_document(session_id: str, file: UploadFile = File(...)):
     with open(filepath, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    result = ingest_document(filepath, session_id=session_id)
+    result = await ingest_document(filepath, session_id=session_id)
 
     return {
         "document_id": result["document_id"],
