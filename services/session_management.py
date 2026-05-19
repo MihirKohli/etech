@@ -15,11 +15,24 @@ async def get_session(db: AsyncSession, session_id: str) -> Session | None:
     return await db.get(Session, session_id)
 
 
-async def list_sessions(db: AsyncSession, user_id: str) -> list[Session]:
-    result = await db.execute(
+async def list_sessions(db: AsyncSession, user_id: str) -> list[dict]:
+    sessions_result = await db.execute(
         select(Session).where(Session.user_id == user_id).order_by(Session.created_at.desc())
     )
-    return list(result.scalars().all())
+    sessions = list(sessions_result.scalars().all())
+
+    rows = []
+    for s in sessions:
+        first_msg_result = await db.execute(
+            select(Message)
+            .where(Message.session_id == s.id, Message.role == "user")
+            .order_by(Message.created_at)
+            .limit(1)
+        )
+        first_msg = first_msg_result.scalar_one_or_none()
+        preview = " ".join(first_msg.content.split()[:5]) if first_msg else "New conversation"
+        rows.append({"session": s, "preview": preview})
+    return rows
 
 
 async def add_message(db: AsyncSession, session_id: str, role: str, content: str) -> Message:
@@ -48,8 +61,8 @@ async def get_recent_messages(db: AsyncSession, session_id: str, limit: int = 10
     return messages
 
 
-async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str, importance: int = 5):
-    mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content, importance=importance)
+async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str):
+    mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content)
     db.add(mem)
     await db.commit()
     return mem

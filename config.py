@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     CHROMA_PERSIST_DIR: str = "./data/chroma_db"
     CHROMA_COLLECTION: str = "rag_documents"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/rag.db"
+    API_URL: str = "http://localhost:8000"
+
     CHUNK_SIZE: int = 512
     CHUNK_OVERLAP: int = 20
     SUMMARY_TRIGGER_TURNS: int = 10

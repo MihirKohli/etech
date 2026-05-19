@@ -8,27 +8,28 @@ from services.document_chunker import chunk_document
 from db.vector_database import add_chunks
 
 
-def ingest_document(filepath: str) -> dict:
+def ingest_document(filepath: str, session_id: str) -> dict:
     """
     Ingest a single document file into the vector store.
 
     Returns: {document_id, filename, chunks_created}
     """
+    from pathlib import Path
+
     document_id = uuid7().hex
 
     # 1. Parse
-    parsed = parse_document(filepath)
+    docs = parse_document(filepath)
 
     # 2. Chunk
-    chunks = chunk_document(parsed, document_id=document_id)
+    chunks = chunk_document(docs, document_id=document_id)
 
     # 3. Embed & store
-    count = add_chunks(chunks)
+    count = add_chunks(chunks, session_id=session_id)
 
     return {
         "document_id": document_id,
-        "filename": parsed.filename,
-        "doc_type": parsed.doc_type,
+        "filename": Path(filepath).name,
         "chunks_created": count,
     }
 

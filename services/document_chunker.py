@@ -6,15 +6,15 @@ then extracts metadata (section headers, code block presence) per chunk.
 """
 
 import re
+from pathlib import Path
 from uuid6 import uuid7
+from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from config import get_settings
-from services.document_parser import ParsedDocument
 
 
 def extract_chunk_metadata(text: str) -> dict:
     """Pull section header and code block info from a chunk."""
-    # Find the last markdown-style header before content
     headers = re.findall(r"^#{1,4}\s+(.+)", text, re.MULTILINE)
     has_code = bool(re.search(r"```[\s\S]*?```|    \S", text))
 
@@ -24,9 +24,9 @@ def extract_chunk_metadata(text: str) -> dict:
     }
 
 
-def chunk_document(doc: ParsedDocument, document_id: str | None = None) -> list[dict]:
+def chunk_document(docs: list[Document], document_id: str | None = None) -> list[dict]:
     """
-    Split a parsed document into chunks ready for embedding.
+    Split LangChain Documents into chunks ready for embedding.
 
     Returns list of dicts with keys: chunk_id, document_id, content, metadata
     """
@@ -39,22 +39,27 @@ def chunk_document(doc: ParsedDocument, document_id: str | None = None) -> list[
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
-    texts = splitter.split_text(doc.content)
+    split_docs = splitter.split_documents(docs)
 
     chunks = []
-    for i, text in enumerate(texts):
-        meta = extract_chunk_metadata(text)
+    for i, doc in enumerate(split_docs):
+        lc_meta = doc.metadata
+        source = lc_meta.get("source", "unknown")
+        meta = extract_chunk_metadata(doc.page_content)
+        page = lc_meta.get("page")
         meta.update({
-            "source_file": doc.filename,
-            "document_type": doc.doc_type,
+            "source_file": Path(source).name if source else "unknown",
+            "document_type": lc_meta.get("file_type", Path(source).suffix.lstrip(".") if source else "unknown"),
             "chunk_index": i,
-            "page_number": None,  # TODO: track page boundaries for PDFs
+            **({"page_number": page} if page is not None else {}),
         })
+        # Chroma rejects None values — remove any that slipped through
+        meta = {k: v for k, v in meta.items() if v is not None}
 
         chunks.append({
             "chunk_id": f"{doc_id}_{i}",
             "document_id": doc_id,
-            "content": text,
+            "content": doc.page_content,
             "metadata": meta,
         })
 

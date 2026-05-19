@@ -1,7 +1,7 @@
 """
 Chroma vector store wrapper — embed chunks, search by query.
 
-Uses OpenAI embeddings via langchain-openai.
+Each session gets its own Chroma collection so documents are isolated per session.
 """
 
 import chromadb
@@ -10,45 +10,46 @@ from config import get_settings
 
 settings = get_settings()
 
-client: chromadb.ClientAPI | None = None
-collection: chromadb.Collection | None = None
-embeddings: OpenAIEmbeddings | None = None
+_client: chromadb.ClientAPI | None = None
+_embeddings: OpenAIEmbeddings | None = None
+_collections: dict[str, chromadb.Collection] = {}
 
 
 def get_embeddings() -> OpenAIEmbeddings:
-    global embeddings
-    if embeddings is None:
-        embeddings = OpenAIEmbeddings(
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = OpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL,
             api_key=settings.OPENAI_API_KEY,
         )
-    return embeddings
+    return _embeddings
 
 
-def get_collection() -> chromadb.Collection:
-    global collection, client
-    if collection is None:
-        client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIR)
-        collection = client.get_or_create_collection(
-            name=settings.CHROMA_COLLECTION,
+def _get_client() -> chromadb.ClientAPI:
+    global _client
+    if _client is None:
+        _client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIR)
+    return _client
+
+
+def get_collection(session_id: str) -> chromadb.Collection:
+    if session_id not in _collections:
+        _collections[session_id] = _get_client().get_or_create_collection(
+            name=f"session_{session_id}",
             metadata={"hnsw:space": "cosine"},
         )
-    return collection
+    return _collections[session_id]
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     return get_embeddings().embed_documents(texts)
 
 
-def add_chunks(chunks: list[dict]) -> int:
-    """
-    Add document chunks to Chroma.
-    Each chunk dict must have: chunk_id, content, metadata
-    """
+def add_chunks(chunks: list[dict], session_id: str) -> int:
     if not chunks:
         return 0
 
-    collection = get_collection()
+    collection = get_collection(session_id)
     ids = [c["chunk_id"] for c in chunks]
     documents = [c["content"] for c in chunks]
     metadatas = [c["metadata"] for c in chunks]
@@ -63,11 +64,8 @@ def add_chunks(chunks: list[dict]) -> int:
     return len(chunks)
 
 
-def search(query: str, top_k: int = 5) -> list[dict]:
-    """
-    Semantic search — returns list of {chunk_id, content, metadata, score}.
-    """
-    collection = get_collection()
+def search(query: str, session_id: str, top_k: int = 5) -> list[dict]:
+    collection = get_collection(session_id)
     query_embedding = get_embeddings().embed_query(query)
 
     results = collection.query(
@@ -82,6 +80,6 @@ def search(query: str, top_k: int = 5) -> list[dict]:
             "chunk_id": results["ids"][0][i],
             "content": results["documents"][0][i],
             "metadata": results["metadatas"][0][i],
-            "score": 1 - results["distances"][0][i],  # cosine distance → similarity
+            "score": 1 - results["distances"][0][i],
         })
     return hits
