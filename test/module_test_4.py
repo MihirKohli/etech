@@ -2,8 +2,6 @@
 Module 4 tests — API endpoints.
 
 Tests mock the LangGraph pipeline so no API key is needed.
-
-Run:  pytest tests/test_module4.py -v
 """
 
 import pytest
@@ -55,7 +53,7 @@ async def test_health(client):
 
 @pytest.mark.asyncio
 async def test_create_session(client):
-    resp = await client.post("/api/sessions?user_id=user1")
+    resp = await client.post("/sessions?user_id=user1")
     assert resp.status_code == 200
     data = resp.json()
     assert "session_id" in data
@@ -64,28 +62,26 @@ async def test_create_session(client):
 
 @pytest.mark.asyncio
 async def test_get_session(client):
-    # Create first
-    resp = await client.post("/api/sessions?user_id=user1")
+    resp = await client.post("/sessions?user_id=user1")
     sid = resp.json()["session_id"]
 
-    # Get
-    resp = await client.get(f"/api/sessions/{sid}")
+    resp = await client.get(f"/sessions/{sid}")
     assert resp.status_code == 200
     assert resp.json()["session_id"] == sid
 
 
 @pytest.mark.asyncio
 async def test_get_session_not_found(client):
-    resp = await client.get("/api/sessions/nonexistent")
+    resp = await client.get("/sessions/nonexistent")
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_list_sessions(client):
-    await client.post("/api/sessions?user_id=user1")
-    await client.post("/api/sessions?user_id=user1")
+    await client.post("/sessions?user_id=user1")
+    await client.post("/sessions?user_id=user1")
 
-    resp = await client.get("/api/sessions?user_id=user1")
+    resp = await client.get("/sessions?user_id=user1")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
 
@@ -94,22 +90,25 @@ async def test_list_sessions(client):
 
 @pytest.mark.asyncio
 async def test_chat(client):
-    # Create session
-    resp = await client.post("/api/sessions?user_id=user1")
+    resp = await client.post("/sessions?user_id=user1")
     sid = resp.json()["session_id"]
 
-    # Mock the pipeline + memory extraction
     mock_result = {
         "answer": "FastAPI is a modern Python web framework.",
         "sources": [],
+        "query_intent": "factual",
+        "retrieval_strategy": "hybrid",
+        "rewritten_query": None,
+        "sub_questions": None,
     }
 
-    with patch("app.api.routes.run_pipeline", return_value=mock_result):
-        with patch("app.api.routes.extract_memories", return_value=[]):
-            resp = await client.post("/api/chat", json={
-                "session_id": sid,
-                "message": "What is FastAPI?",
-            })
+    with patch("routes.chat.run_pipeline", return_value=mock_result):
+        with patch("routes.chat.extract_memories", return_value=[]):
+            with patch("routes.chat.save_agent_trace", return_value=None):
+                resp = await client.post("/chat", json={
+                    "session_id": sid,
+                    "message": "What is FastAPI?",
+                })
 
     assert resp.status_code == 200
     data = resp.json()
@@ -119,8 +118,8 @@ async def test_chat(client):
 
 @pytest.mark.asyncio
 async def test_chat_invalid_session(client):
-    with patch("app.api.routes.run_pipeline", return_value={"answer": "x", "sources": []}):
-        resp = await client.post("/api/chat", json={
+    with patch("routes.chat.run_pipeline", return_value={"answer": "x", "sources": []}):
+        resp = await client.post("/chat", json={
             "session_id": "bad_id",
             "message": "hello",
         })
@@ -132,7 +131,8 @@ async def test_chat_invalid_session(client):
 @pytest.mark.asyncio
 async def test_upload_unsupported_file(client):
     resp = await client.post(
-        "/api/documents/upload",
+        "/documents/upload",
         files={"file": ("test.txt", b"hello", "text/plain")},
+        params={"session_id": "any"},
     )
     assert resp.status_code == 400

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     CHROMA_HOST: str = ""        # set to "chroma" in Docker; empty = use local PersistentClient
     CHROMA_PORT: int = 8001
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/rag.db"
-    API_URL: str = "http://localhost:8000"
+    API_URL: str = "http://localhost:8080"
 
     CHUNK_SIZE: int = 512
     CHUNK_OVERLAP: int = 20

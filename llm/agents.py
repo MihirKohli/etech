@@ -16,8 +16,7 @@ from db.vector_database import search, keyword_search
 logger = logging.getLogger(__name__)
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
+# Helpers
 def format_history(messages: list[dict], limit: int = 6) -> str:
     if not messages:
         return "No prior conversation."
@@ -37,8 +36,7 @@ def format_context(chunks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-# ── Agents ───────────────────────────────────────────────────────────────────
-
+# Agents 
 # def query_understanding_agent(state: AgentState) -> dict:
 async def query_understanding_agent(state: AgentState) -> dict:
     PROMPT = ChatPromptTemplate.from_messages([
@@ -337,8 +335,7 @@ Only extract genuinely useful long-term information. Skip transient questions.""
     return memories
 
 
-# ── LangGraph Pipeline ───────────────────────────────────────────────────────
-
+# LangGraph Pipeline 
 def route_retrieval(state: AgentState) -> str:
     strategy = state.get("retrieval_strategy", RetrievalStrategy.SEMANTIC)
     if strategy == RetrievalStrategy.MEMORY_ONLY:

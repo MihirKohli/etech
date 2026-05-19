@@ -12,14 +12,12 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any, TypedDict
-from uuid import uuid4
+from uuid6 import uuid7
 
 from pydantic import BaseModel, Field
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Enums
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class DocumentType(str, Enum):
     PDF = "pdf"
@@ -44,9 +42,7 @@ class RetrievalStrategy(str, Enum):
     MEMORY_ONLY = "memory_only"   # answer from conversation history alone
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  API Schemas
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class SessionCreate(BaseModel):
     """POST /sessions — start a new conversation."""
@@ -65,6 +61,13 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
 
+class SourceInfo(BaseModel):
+    """A single retrieved chunk shown as a citation."""
+    document_name: str
+    page: int | None = None
+    section: str | None = None
+    score: float
+    snippet: str
 
 class ChatResponse(BaseModel):
     session_id: str
@@ -76,13 +79,6 @@ class ChatResponse(BaseModel):
     # )
 
 
-class SourceInfo(BaseModel):
-    """A single retrieved chunk shown as a citation."""
-    document_name: str
-    page: int | None = None
-    section: str | None = None
-    score: float
-    snippet: str
 
 
 class DocumentUploadResponse(BaseModel):
@@ -92,21 +88,8 @@ class DocumentUploadResponse(BaseModel):
     metadata: dict[str, Any] = {}
 
 
-# Fix forward reference (ChatResponse uses SourceInfo)
-ChatResponse.model_rebuild()
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Internal DTOs
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-class DocumentChunk(BaseModel):
-    """A single chunk ready for embedding and vector storage."""
-    chunk_id: str = Field(default_factory=lambda: uuid4().hex)
-    document_id: str
-    content: str
-    metadata: ChunkMetadata
-
 
 class ChunkMetadata(BaseModel):
     source_file: str
@@ -116,9 +99,14 @@ class ChunkMetadata(BaseModel):
     has_code_block: bool = False
     chunk_index: int = 0
 
+class DocumentChunk(BaseModel):
+    """A single chunk ready for embedding and vector storage."""
+    chunk_id: str = Field(default_factory=lambda: uuid7().hex)
+    document_id: str
+    content: str
+    metadata: ChunkMetadata
 
-# Rebuild DocumentChunk now that ChunkMetadata is defined
-DocumentChunk.model_rebuild()
+
 
 
 class SearchResult(BaseModel):
@@ -129,9 +117,7 @@ class SearchResult(BaseModel):
     score: float
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  LangGraph Agent State
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class AgentState(TypedDict, total=False):
     """
@@ -143,38 +129,38 @@ class AgentState(TypedDict, total=False):
     only set the keys it owns.
     """
 
-    # ── Input ────────────────────────────────────────────
+    # Input
     session_id: str
     user_id: str
     original_query: str
 
-    # ── Query Understanding Agent output ─────────────────
+    # Query Understanding Agent output
     query_intent: QueryIntent
     needs_history: bool
     needs_retrieval: bool
 
-    # ── Query Rewriting Agent output ─────────────────────
+    #  Query Rewriting Agent output 
     rewritten_query: str
 
-    # ── Retrieval Router Agent output ────────────────────
+    #  Retrieval Router Agent output 
     retrieval_strategy: RetrievalStrategy
 
-    # ── Retrieved context ────────────────────────────────
+    #  Retrieved context 
     retrieved_chunks: list[SearchResult]
 
-    # ── Conversation history (loaded by memory agent) ────
+    #  Conversation history (loaded by memory agent) 
     conversation_history: list[dict[str, str]]
     conversation_summary: str
 
-    # ── Context Synthesis Agent output ───────────────────
+    #  Context Synthesis Agent output 
     synthesized_context: str
 
-    # ── Final answer ─────────────────────────────────────
+    #  Final answer 
     answer: str
     sources: list[SourceInfo]
 
-    # ── Query decomposition output ───────────────────────
+    #  Query decomposition output 
     sub_questions: list[str]
 
-    # ── Trace / observability ────────────────────────────
+    #  Trace / observability 
     # agent_trace: list[str]

@@ -10,7 +10,7 @@ Usage:
     # Ensure the API is running first:
     #   uvicorn main:app --reload
     #
-    python scripts/benchmark.py --base-url http://localhost:8000 --rounds 10
+    python scripts/benchmark.py --base-url http://localhost:8080 --rounds 10
 """
 
 import argparse
@@ -22,9 +22,9 @@ from pathlib import Path
 
 import requests
 
-# ── Config ────────────────────────────────────────────────────────────────────
+#  Config 
 
-DEFAULT_BASE_URL = os.getenv("API_URL", "http://localhost:8000")
+DEFAULT_BASE_URL = os.getenv("API_URL", "http://localhost:8080")
 TEST_USER_ID = "benchmark_user"
 
 # Multi-turn conversation designed to test context preservation
@@ -46,7 +46,7 @@ FACTUAL_QUERIES = [
 ]
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# Helpers
 
 def post(url, **kwargs) -> dict:
     r = requests.post(url, **kwargs, timeout=120)

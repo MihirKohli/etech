@@ -35,7 +35,7 @@ async def ingest_document(filepath: str, session_id: str) -> dict:
     }
 
 
-def ingest_directory(dirpath: str) -> list[dict]:
+async def ingest_directory(dirpath: str, session_id: str) -> list[dict]:
     """Ingest all supported files in a directory."""
     from pathlib import Path
 
@@ -44,7 +44,7 @@ def ingest_directory(dirpath: str) -> list[dict]:
 
     for f in Path(dirpath).iterdir():
         if f.suffix.lower() in supported:
-            result = ingest_document(str(f))
+            result = await ingest_document(str(f), session_id=session_id)
             results.append(result)
             print(f"  ✓ {result['filename']} → {result['chunks_created']} chunks")
 

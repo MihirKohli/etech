@@ -1,0 +1,15 @@
+[run]
+source = .
+omit =
+    test/*
+    scripts/*
+    streamlit_ui.py
+    .venv/*
+    */site-packages/*
+
+[report]
+show_missing = true
+fail_under = 70
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

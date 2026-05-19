@@ -7,7 +7,7 @@ router = APIRouter()
  
 UPLOAD_DIR = "./data/uploads"
  
-# ── Memories ─────────────────────────────────────────
+# Memories
  
 @router.get("/memories/{user_id}")
 async def get_memories(user_id: str, db: AsyncSession = Depends(get_db)):

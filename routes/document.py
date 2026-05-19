@@ -7,10 +7,6 @@ router = APIRouter()
  
 UPLOAD_DIR = "./data/uploads"
  
-
-
-# ── Document Upload ──────────────────────────────────
- 
 @router.post("/documents/upload")
 async def upload_document(session_id: str, file: UploadFile = File(...)):
     allowed = {".pdf", ".md", ".html", ".htm"}

@@ -1,70 +1,87 @@
-
 services:
   chroma:
     image: chromadb/chroma:latest
+    container_name: etech-chroma
+
     ports:
       - "8001:8000"
+
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data
+
     environment:
-      - IS_PERSISTENT=TRUE
-      - ANONYMIZED_TELEMETRY=FALSE
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 10s
-      retries: 5
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+
+    restart: unless-stopped
 
   postgres:
     image: postgres:15-alpine
+    container_name: etech-postgres
+
     environment:
       POSTGRES_USER: rag
       POSTGRES_PASSWORD: rag
       POSTGRES_DB: ragdb
+
     ports:
       - "5432:5432"
+
     volumes:
       - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rag -d ragdb"]
-      interval: 10s
-      retries: 5
+
+    restart: unless-stopped
 
   api:
     build: .
+    container_name: etech-api
+
     ports:
-      - "8000:8000"
+      - "8080:8080"
+
     env_file:
       - .env
+
     environment:
-      - CHROMA_HOST=chroma
-      - CHROMA_PORT=8000
-      - DATABASE_URL=postgresql+asyncpg://rag:rag@postgres:5432/ragdb
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      DATABASE_URL: postgresql+asyncpg://rag:rag@postgres:5432/ragdb
+
     volumes:
       - upload_data:/app/data/uploads
+
     depends_on:
-      chroma:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      retries: 3
+      - chroma
+      - postgres
+
+    command: uvicorn main:app --host 0.0.0.0 --port 8080
+
+    restart: unless-stopped
 
   streamlit:
     build: .
+    container_name: etech-streamlit
+
     ports:
       - "8501:8501"
+
     env_file:
       - .env
+
+    environment:
+      API_URL: http://api:8080
+
     depends_on:
       - api
-    command: streamlit run streamlit_ui.py --server.port 8501 --server.address 0.0.0.0
-    environment:
-      - API_URL=http://api:8000
+
+    command: >
+      streamlit run streamlit_ui.py
+      --server.port 8501
+      --server.address 0.0.0.0
+
+    restart: unless-stopped
 
 volumes:
   chroma_data:
-  upload_data:
   pg_data:
+  upload_data:
