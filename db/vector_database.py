@@ -84,6 +84,31 @@ async def add_chunks(chunks: list[dict], session_id: str) -> int:
 #     return [{"chunk_id": results["ids"][0][i], "content": results["documents"][0][i],
 #              "metadata": results["metadatas"][0][i],
 #              "score": 1 - results["distances"][0][i]} for i in range(len(results["ids"][0]))]
+def keyword_search(query: str, session_id: str, top_k: int = 5) -> list[dict]:
+    """Keyword search using Chroma's where_document contains filter."""
+    collection = get_collection(session_id)
+    keywords = [w for w in query.lower().split() if len(w) > 3]
+    if not keywords:
+        return []
+
+    results = collection.query(
+        query_texts=keywords[:1],
+        n_results=top_k,
+        where_document={"$contains": keywords[0]},
+        include=["documents", "metadatas", "distances"],
+    )
+
+    hits = []
+    for i in range(len(results["ids"][0])):
+        hits.append({
+            "chunk_id": results["ids"][0][i],
+            "content": results["documents"][0][i],
+            "metadata": results["metadatas"][0][i],
+            "score": 0.5,  # flat keyword score, will be re-ranked after merge
+        })
+    return hits
+
+
 async def search(query: str, session_id: str, top_k: int = 5) -> list[dict]:
     collection = get_collection(session_id)
     query_embedding = await get_embeddings().aembed_query(query)

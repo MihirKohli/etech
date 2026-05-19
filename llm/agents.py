@@ -10,7 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
 from llm.llm import get_openai_llm
 from llm.schema import AgentState, QueryIntent, RetrievalStrategy, SourceInfo
-from db.vector_database import search
+from db.vector_database import search, keyword_search
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -132,27 +132,35 @@ async def retrieval_router_agent(state: AgentState) -> dict:
     return {"retrieval_strategy": RetrievalStrategy.SEMANTIC}
 
 
-# def retrieval_node(state: AgentState) -> dict:
-async def retrieval_node(state: AgentState) -> dict:
-    strategy = state.get("retrieval_strategy", RetrievalStrategy.SEMANTIC)
-    if strategy == RetrievalStrategy.MEMORY_ONLY:
-        return {"retrieved_chunks": []}
-
+async def semantic_retrieval_node(state: AgentState) -> dict:
     query = state.get("rewritten_query", state["original_query"])
-    top_k = 7 if strategy == RetrievalStrategy.HYBRID else 5
-    # results = search(query, session_id=state["session_id"], top_k=top_k)
-    results = await search(query, session_id=state["session_id"], top_k=top_k)
-
-    chunks = [
-        {
-            "chunk_id": r["chunk_id"],
-            "content": r["content"],
-            "metadata": r["metadata"],
-            "score": r["score"],
-        }
+    results = await search(query, session_id=state["session_id"], top_k=5)
+    return {"retrieved_chunks": [
+        {"chunk_id": r["chunk_id"], "content": r["content"], "metadata": r["metadata"], "score": r["score"]}
         for r in results
-    ]
+    ]}
+
+
+async def hybrid_retrieval_node(state: AgentState) -> dict:
+    query = state.get("rewritten_query", state["original_query"])
+    session_id = state["session_id"]
+
+    semantic_results = await search(query, session_id=session_id, top_k=7)
+    keyword_results = keyword_search(query, session_id=session_id, top_k=7)
+
+    # Merge by chunk_id, semantic score wins on conflict
+    merged: dict[str, dict] = {}
+    for r in keyword_results:
+        merged[r["chunk_id"]] = {"chunk_id": r["chunk_id"], "content": r["content"], "metadata": r["metadata"], "score": r["score"]}
+    for r in semantic_results:
+        merged[r["chunk_id"]] = {"chunk_id": r["chunk_id"], "content": r["content"], "metadata": r["metadata"], "score": r["score"]}
+
+    chunks = sorted(merged.values(), key=lambda x: x["score"], reverse=True)[:7]
     return {"retrieved_chunks": chunks}
+
+
+async def memory_only_node(_state: AgentState) -> dict:
+    return {"retrieved_chunks": []}
 
 
 # def context_synthesis_agent(state: AgentState) -> dict:
@@ -278,20 +286,37 @@ Only extract genuinely useful long-term information. Skip transient questions.""
 
 # ── LangGraph Pipeline ───────────────────────────────────────────────────────
 
+def route_retrieval(state: AgentState) -> str:
+    strategy = state.get("retrieval_strategy", RetrievalStrategy.SEMANTIC)
+    if strategy == RetrievalStrategy.MEMORY_ONLY:
+        return "memory_only"
+    if strategy == RetrievalStrategy.HYBRID:
+        return "hybrid_retrieval"
+    return "semantic_retrieval"
+
+
 def build_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
     graph.add_node("query_understanding", query_understanding_agent)
     graph.add_node("query_rewriting", query_rewriting_agent)
     graph.add_node("retrieval_router", retrieval_router_agent)
-    graph.add_node("retrieval", retrieval_node)
+    graph.add_node("semantic_retrieval", semantic_retrieval_node)
+    graph.add_node("hybrid_retrieval", hybrid_retrieval_node)
+    graph.add_node("memory_only", memory_only_node)
     graph.add_node("context_synthesis", context_synthesis_agent)
 
     graph.set_entry_point("query_understanding")
     graph.add_edge("query_understanding", "query_rewriting")
     graph.add_edge("query_rewriting", "retrieval_router")
-    graph.add_edge("retrieval_router", "retrieval")
-    graph.add_edge("retrieval", "context_synthesis")
+    graph.add_conditional_edges("retrieval_router", route_retrieval, {
+        "semantic_retrieval": "semantic_retrieval",
+        "hybrid_retrieval": "hybrid_retrieval",
+        "memory_only": "memory_only",
+    })
+    graph.add_edge("semantic_retrieval", "context_synthesis")
+    graph.add_edge("hybrid_retrieval", "context_synthesis")
+    graph.add_edge("memory_only", "context_synthesis")
     graph.add_edge("context_synthesis", END)
 
     return graph.compile()

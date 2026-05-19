@@ -114,7 +114,6 @@ class ChunkMetadata(BaseModel):
     page_number: int | None = None
     section_header: str | None = None
     has_code_block: bool = False
-    version: str | None = None
     chunk_index: int = 0
 
 
