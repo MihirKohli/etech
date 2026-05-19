@@ -20,8 +20,6 @@ build/
 # OS
 .DS_Store
 
-# Data
-data/
 
 # Claude
 .claude
