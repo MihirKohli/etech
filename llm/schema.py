@@ -173,5 +173,8 @@ class AgentState(TypedDict, total=False):
     answer: str
     sources: list[SourceInfo]
 
+    # ── Query decomposition output ───────────────────────
+    sub_questions: list[str]
+
     # ── Trace / observability ────────────────────────────
     agent_trace: list[str]

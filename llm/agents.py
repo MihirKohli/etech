@@ -166,6 +166,56 @@ async def memory_only_node(_state: AgentState) -> dict:
     return {"retrieved_chunks": []}
 
 
+async def query_decomposition_node(state: AgentState) -> dict:
+    """
+    For MULTI_PART queries: split the question into sub-questions, run hybrid
+    retrieval for each, then merge results (deduped by chunk_id).
+    Falls back to a single hybrid retrieval if decomposition yields nothing.
+    """
+    PROMPT = ChatPromptTemplate.from_messages([
+        ("system", """Break the user question into independent sub-questions.
+Output ONLY a numbered list, one sub-question per line.
+If the question is not multi-part, output it unchanged as a single item.
+Maximum 4 sub-questions.
+
+Example:
+1. What is LangChain?
+2. How does it compare to LlamaIndex?"""),
+        ("human", "{query}"),
+    ])
+    llm = get_openai_llm()
+    response = await (PROMPT | llm).ainvoke({
+        "query": state.get("rewritten_query", state["original_query"]),
+    })
+
+    lines = [l.strip() for l in response.content.strip().splitlines() if l.strip()]
+    sub_questions = []
+    for line in lines:
+        # strip leading "1. " / "- " markers
+        clean = line.lstrip("0123456789.-) ").strip()
+        if clean:
+            sub_questions.append(clean)
+
+    if not sub_questions:
+        sub_questions = [state.get("rewritten_query", state["original_query"])]
+
+    session_id = state["session_id"]
+    merged: dict[str, dict] = {}
+    for sq in sub_questions:
+        sem = await search(sq, session_id=session_id, top_k=5)
+        kw = keyword_search(sq, session_id=session_id, top_k=5)
+        for r in kw:
+            merged.setdefault(r["chunk_id"], r)
+        for r in sem:
+            merged[r["chunk_id"]] = r  # semantic score wins
+
+    chunks = sorted(merged.values(), key=lambda x: x["score"], reverse=True)[:8]
+    return {
+        "retrieved_chunks": chunks,
+        "sub_questions": sub_questions,
+    }
+
+
 # def context_synthesis_agent(state: AgentState) -> dict:
 async def context_synthesis_agent(state: AgentState) -> dict:
     PROMPT = ChatPromptTemplate.from_messages([
@@ -294,7 +344,7 @@ def route_retrieval(state: AgentState) -> str:
     if strategy == RetrievalStrategy.MEMORY_ONLY:
         return "memory_only"
     if strategy == RetrievalStrategy.HYBRID:
-        return "hybrid_retrieval"
+        return "query_decomposition"
     return "semantic_retrieval"
 
 
@@ -305,7 +355,7 @@ def build_graph() -> StateGraph:
     graph.add_node("query_rewriting", query_rewriting_agent)
     graph.add_node("retrieval_router", retrieval_router_agent)
     graph.add_node("semantic_retrieval", semantic_retrieval_node)
-    graph.add_node("hybrid_retrieval", hybrid_retrieval_node)
+    graph.add_node("query_decomposition", query_decomposition_node)
     graph.add_node("memory_only", memory_only_node)
     graph.add_node("context_synthesis", context_synthesis_agent)
 
@@ -314,11 +364,11 @@ def build_graph() -> StateGraph:
     graph.add_edge("query_rewriting", "retrieval_router")
     graph.add_conditional_edges("retrieval_router", route_retrieval, {
         "semantic_retrieval": "semantic_retrieval",
-        "hybrid_retrieval": "hybrid_retrieval",
+        "query_decomposition": "query_decomposition",
         "memory_only": "memory_only",
     })
     graph.add_edge("semantic_retrieval", "context_synthesis")
-    graph.add_edge("hybrid_retrieval", "context_synthesis")
+    graph.add_edge("query_decomposition", "context_synthesis")
     graph.add_edge("memory_only", "context_synthesis")
     graph.add_edge("context_synthesis", END)
 
@@ -369,3 +419,67 @@ async def run_pipeline(
             final_state = event.get("data", {}).get("output", {})
 
     return final_state
+
+
+async def stream_pipeline(
+    session_id: str,
+    user_id: str,
+    query: str,
+    conversation_history: list[dict],
+    conversation_summary: str = "",
+):
+    """
+    Yields token strings from context_synthesis, then a final dict with
+    {"done": True, "answer": ..., "sources": ...} for the caller to save.
+    """
+    initial_state: AgentState = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "original_query": query,
+        "conversation_history": conversation_history,
+        "conversation_summary": conversation_summary,
+    }
+
+    full_answer = []
+    final_state = {}
+
+    async for event in pipeline.astream_events(initial_state, version="v2"):
+        kind = event["event"]
+        name = event.get("name", "")
+        meta = event.get("metadata", {})
+
+        # Log nodes and edges (same as run_pipeline)
+        if kind == "on_chain_start" and name in {
+            "query_understanding", "query_rewriting", "retrieval_router",
+            "semantic_retrieval", "hybrid_retrieval", "memory_only", "context_synthesis",
+        }:
+            logger.info(f"[node:start]  {name}")
+
+        elif kind == "on_chain_end" and name in {
+            "query_understanding", "query_rewriting", "retrieval_router",
+            "semantic_retrieval", "hybrid_retrieval", "memory_only", "context_synthesis",
+        }:
+            logger.info(f"[node:end]    {name}")
+            if name == "retrieval_router":
+                strategy = event.get("data", {}).get("output", {}).get("retrieval_strategy", "")
+                logger.info(f"[edge]        retrieval_router → {strategy}")
+
+        # Stream tokens only from the context_synthesis node
+        elif (
+            kind == "on_chat_model_stream"
+            and meta.get("langgraph_node") == "context_synthesis"
+        ):
+            token = event["data"]["chunk"].content
+            if token:
+                full_answer.append(token)
+                yield token
+
+        elif kind == "on_chain_end" and name == "LangGraph":
+            final_state = event.get("data", {}).get("output", {})
+
+    # Final metadata event — caller uses this to save to DB
+    yield {
+        "done": True,
+        "answer": "".join(full_answer),
+        "sources": final_state.get("sources", []),
+    }

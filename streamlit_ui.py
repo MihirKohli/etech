@@ -4,6 +4,7 @@ Streamlit UI — chat interface with session management and document upload.
 Run:  streamlit run app/ui/streamlit_app.py
 """
 
+import json
 import streamlit as st
 import requests
 from config import get_settings
@@ -122,33 +123,80 @@ for msg in st.session_state["messages"]:
 
 # Chat input
 if prompt := st.chat_input("Ask a question..."):
-    # Show user message
     st.session_state["messages"].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Call API
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            result = api_post("/chat", json={
-                "session_id": st.session_state["session_id"],
-                "message": prompt,
-            })
+        # Use a dict so the nested generator can mutate shared state
+        # (nonlocal doesn't work at module scope)
+        state = {"full_answer": "", "sources": [], "error": False}
 
-        if result:
-            st.write(result["answer"])
+        def token_stream():
+            """Generator that yields tokens from the SSE stream."""
+            try:
+                with requests.post(
+                    f"{API_URL}/chat/stream",
+                    json={"session_id": st.session_state["session_id"], "message": prompt},
+                    stream=True,
+                    timeout=60,
+                ) as resp:
+                    resp.raise_for_status()
+                    for raw in resp.iter_lines():
+                        if not raw:
+                            continue
+                        line = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+                        if not line.startswith("data: "):
+                            continue
+                        payload = line[len("data: "):]
+                        if payload.startswith("[DONE]"):
+                            done_data = json.loads(payload[len("[DONE] "):])
+                            state["sources"] = done_data.get("sources", [])
+                        else:
+                            state["full_answer"] += payload
+                            yield payload
+            except Exception as e:
+                state["error"] = True
+                st.error(f"Stream error: {e}")
 
-            sources = result.get("sources", [])
-            if sources:
+        st.write_stream(token_stream())
+
+        if not state["error"]:
+            if state["sources"]:
                 with st.expander("📄 Sources"):
-                    for s in sources:
+                    for s in state["sources"]:
                         st.caption(f"**{s['document_name']}** (score: {s['score']:.2f})")
                         st.text(s["snippet"])
 
             st.session_state["messages"].append({
                 "role": "assistant",
-                "content": result["answer"],
-                "sources": sources,
+                "content": state["full_answer"],
+                "sources": state["sources"],
             })
+
+
+# ── Explainability Dashboard ──────────────────────────
+
+st.divider()
+with st.expander("🔍 Agent Decision Log (Explainability Dashboard)"):
+    if "session_id" in st.session_state:
+        traces = api_get(f"/chat/trace/{st.session_state['session_id']}")
+        if traces:
+            for t in traces:
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.markdown(f"**Turn {t['turn']}**")
+                    st.caption(f"Intent: `{t['query_intent']}`")
+                    st.caption(f"Strategy: `{t['retrieval_strategy']}`")
+                with col2:
+                    if t.get("rewritten_query"):
+                        st.markdown(f"Rewritten: _{t['rewritten_query']}_")
+                    if t.get("sub_questions"):
+                        st.markdown("Sub-questions:")
+                        for sq in t["sub_questions"]:
+                            st.markdown(f"- {sq}")
+                st.divider()
         else:
-            st.error("Failed to get response.")
+            st.info("No agent traces yet. Send a message to see the decision log.")
+    else:
+        st.info("Load a session to view the agent decision log.")

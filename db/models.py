@@ -29,6 +29,21 @@ class Message(Base):
     session = relationship("Session", back_populates="messages")
 
 
+class AgentTrace(Base):
+    """Stores per-turn agent decision log for explainability."""
+    __tablename__ = "agent_traces"
+
+    id = Column(String, primary_key=True, default=lambda: uuid7().hex)
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    message_id = Column(String, nullable=True)
+    query_intent = Column(String, nullable=True)
+    retrieval_strategy = Column(String, nullable=True)
+    rewritten_query = Column(Text, nullable=True)
+    sub_questions = Column(Text, nullable=True)   # JSON array
+    nodes_visited = Column(Text, nullable=True)   # JSON array
+    created_at = Column(DateTime, default=datetime.now)
+
+
 class ConversationMemory(Base):
     """Cross-session long-term memory per user."""
     __tablename__ = "conversation_memory"
@@ -37,5 +52,6 @@ class ConversationMemory(Base):
     user_id = Column(String, nullable=False, index=True)
     memory_type = Column(String, nullable=False)   # "preference" | "fact" | "summary"
     content = Column(Text, nullable=False)
+    importance = Column(Integer, default=5)
     created_at = Column(DateTime, default=datetime.now)
 

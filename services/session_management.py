@@ -1,6 +1,7 @@
+import json
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.models import Session, Message, ConversationMemory
+from db.models import Session, Message, ConversationMemory, AgentTrace
 
 
 async def create_session(db: AsyncSession, user_id: str) -> Session:
@@ -61,8 +62,8 @@ async def get_recent_messages(db: AsyncSession, session_id: str, limit: int = 10
     return messages
 
 
-async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str):
-    mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content)
+async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str, importance: int = 5):
+    mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content, importance=importance)
     db.add(mem)
     await db.commit()
     return mem
@@ -83,3 +84,35 @@ async def update_session_summary(db: AsyncSession, session_id: str, summary: str
     if session:
         session.summary = summary
         await db.commit()
+
+
+async def save_agent_trace(
+    db: AsyncSession,
+    session_id: str,
+    query_intent: str | None,
+    retrieval_strategy: str | None,
+    rewritten_query: str | None,
+    sub_questions: list[str] | None,
+    nodes_visited: list[str] | None,
+):
+    trace = AgentTrace(
+        session_id=session_id,
+        query_intent=query_intent,
+        retrieval_strategy=retrieval_strategy,
+        rewritten_query=rewritten_query,
+        sub_questions=json.dumps(sub_questions or []),
+        nodes_visited=json.dumps(nodes_visited or []),
+    )
+    db.add(trace)
+    await db.commit()
+    return trace
+
+
+async def get_session_traces(db: AsyncSession, session_id: str, limit: int = 50) -> list[AgentTrace]:
+    result = await db.execute(
+        select(AgentTrace)
+        .where(AgentTrace.session_id == session_id)
+        .order_by(AgentTrace.created_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())

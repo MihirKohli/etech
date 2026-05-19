@@ -3,8 +3,7 @@ Parses PDF, Markdown, and HTML files using LangChain document loaders.
 """
 
 from pathlib import Path
-from langchain_community.document_loaders import BSHTMLLoader, PyPDFLoader
-from langchain_community.document_loaders.markdown import UnstructuredMarkdownLoader
+from langchain_community.document_loaders import BSHTMLLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 
 # from pypdf import PdfReader
@@ -54,7 +53,7 @@ def parse_pdf(filepath: str) -> list[Document]:
 
 
 def parse_markdown(filepath: str) -> list[Document]:
-    return UnstructuredMarkdownLoader(filepath).load()
+    return TextLoader(filepath, encoding="utf-8").load()
 
 
 def parse_html(filepath: str) -> list[Document]:

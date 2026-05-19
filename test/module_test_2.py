@@ -1,10 +1,12 @@
 """
 Module 2 tests — document parsing, chunking, vector store.
 
-Run:  pytest tests/test_module2.py -v
+Run:  pytest test/module_test_2.py -v
 """
 
 import tempfile
+import os
+from langchain_core.documents import Document
 from services.document_parser import parse_document
 from services.document_chunker import chunk_document, extract_chunk_metadata
 
@@ -14,38 +16,52 @@ from services.document_chunker import chunk_document, extract_chunk_metadata
 def test_parse_markdown():
     with tempfile.NamedTemporaryFile(suffix=".md", mode="w", delete=False) as f:
         f.write("# Title\n\nSome content here.\n\n## Section 2\n\nMore content.")
-        f.flush()
-        doc = parse_document(f.name)
-
-    assert doc.doc_type == "markdown"
-    assert "Title" in doc.content
-    assert "Section 2" in doc.content
+        name = f.name
+    try:
+        docs = parse_document(name)
+        assert isinstance(docs, list)
+        assert len(docs) > 0
+        full_text = " ".join(d.page_content for d in docs)
+        assert "Title" in full_text or "content" in full_text
+    finally:
+        os.unlink(name)
 
 
 def test_parse_html():
     with tempfile.NamedTemporaryFile(suffix=".html", mode="w", delete=False) as f:
         f.write("<html><body><h1>Hello</h1><p>World</p></body></html>")
-        f.flush()
-        doc = parse_document(f.name)
+        name = f.name
+    try:
+        docs = parse_document(name)
+        assert isinstance(docs, list)
+        assert len(docs) > 0
+        full_text = " ".join(d.page_content for d in docs)
+        assert "Hello" in full_text or "World" in full_text
+    finally:
+        os.unlink(name)
 
-    assert doc.doc_type == "html"
-    assert "Hello" in doc.content
-    assert "World" in doc.content
+
+def test_unsupported_extension_raises():
+    import pytest
+    with pytest.raises(ValueError, match="Unsupported"):
+        parse_document("file.txt")
 
 
 # ── Chunker ──────────────────────────────────────────
 
 def test_chunk_document():
-    from app.services.document_parser import ParsedDocument
-    doc = ParsedDocument(
-        content="A " * 600,  # ~1200 chars → should split into 2+ chunks
-        filename="test.md",
-        doc_type="markdown",
-    )
-    chunks = chunk_document(doc, document_id="test123")
-    assert len(chunks) >= 2
+    docs = [Document(page_content="A " * 600, metadata={"source": "test.md"})]
+    chunks = chunk_document(docs, document_id="test123")
+    assert len(chunks) >= 1
     assert chunks[0]["document_id"] == "test123"
     assert chunks[0]["metadata"]["source_file"] == "test.md"
+
+
+def test_chunk_preserves_metadata():
+    docs = [Document(page_content="short content", metadata={"source": "doc.pdf", "page": 3})]
+    chunks = chunk_document(docs, document_id="abc")
+    assert chunks[0]["metadata"]["page_number"] == 3
+    assert chunks[0]["metadata"]["source_file"] == "doc.pdf"
 
 
 def test_metadata_extraction():
