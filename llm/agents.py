@@ -482,4 +482,9 @@ async def stream_pipeline(
         "done": True,
         "answer": "".join(full_answer),
         "sources": final_state.get("sources", []),
+        "query_intent": final_state.get("query_intent"),
+        "retrieval_strategy": final_state.get("retrieval_strategy"),
+        "rewritten_query": final_state.get("rewritten_query"),
+        "sub_questions": final_state.get("sub_questions"),
+        "agent_trace": final_state.get("agent_trace"),
     }

@@ -188,6 +188,8 @@ with st.expander("🔍 Agent Decision Log (Explainability Dashboard)"):
                     st.markdown(f"**Turn {t['turn']}**")
                     st.caption(f"Intent: `{t['query_intent']}`")
                     st.caption(f"Strategy: `{t['retrieval_strategy']}`")
+                    if t.get("response_time_ms") is not None:
+                        st.caption(f"Response time: `{t['response_time_ms']:.0f} ms`")
                 with col2:
                     if t.get("rewritten_query"):
                         st.markdown(f"Rewritten: _{t['rewritten_query']}_")
@@ -196,7 +198,3 @@ with st.expander("🔍 Agent Decision Log (Explainability Dashboard)"):
                         for sq in t["sub_questions"]:
                             st.markdown(f"- {sq}")
                 st.divider()
-        else:
-            st.info("No agent traces yet. Send a message to see the decision log.")
-    else:
-        st.info("Load a session to view the agent decision log.")

@@ -16,7 +16,6 @@ async def get_memories(user_id: str, db: AsyncSession = Depends(get_db)):
         {
             "memory_type": m.memory_type,
             "content": m.content,
-            "importance": m.importance,
             "created_at": m.created_at,
         }
         for m in memories

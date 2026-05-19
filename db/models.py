@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid6 import uuid7
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Integer, Float, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 class Base(DeclarativeBase):
@@ -39,8 +39,9 @@ class AgentTrace(Base):
     query_intent = Column(String, nullable=True)
     retrieval_strategy = Column(String, nullable=True)
     rewritten_query = Column(Text, nullable=True)
-    sub_questions = Column(Text, nullable=True)   # JSON array
-    nodes_visited = Column(Text, nullable=True)   # JSON array
+    sub_questions = Column(Text, nullable=True)      # JSON array
+    nodes_visited = Column(Text, nullable=True)      # JSON array
+    response_time_ms = Column(Float, nullable=True)  # total request→response ms
     created_at = Column(DateTime, default=datetime.now)
 
 
@@ -52,6 +53,5 @@ class ConversationMemory(Base):
     user_id = Column(String, nullable=False, index=True)
     memory_type = Column(String, nullable=False)   # "preference" | "fact" | "summary"
     content = Column(Text, nullable=False)
-    importance = Column(Integer, default=5)
     created_at = Column(DateTime, default=datetime.now)
 

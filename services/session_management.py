@@ -62,8 +62,8 @@ async def get_recent_messages(db: AsyncSession, session_id: str, limit: int = 10
     return messages
 
 
-async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str, importance: int = 5):
-    mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content, importance=importance)
+async def save_memory(db: AsyncSession, user_id: str, memory_type: str, content: str):
+    mem = ConversationMemory(user_id=user_id, memory_type=memory_type, content=content)
     db.add(mem)
     await db.commit()
     return mem
@@ -73,7 +73,7 @@ async def get_user_memories(db: AsyncSession, user_id: str, limit: int = 20) -> 
     result = await db.execute(
         select(ConversationMemory)
         .where(ConversationMemory.user_id == user_id)
-        .order_by(ConversationMemory.importance.desc())
+        .order_by(ConversationMemory.created_at.desc())
         .limit(limit)
     )
     return list(result.scalars().all())
@@ -94,6 +94,7 @@ async def save_agent_trace(
     rewritten_query: str | None,
     sub_questions: list[str] | None,
     nodes_visited: list[str] | None,
+    response_time_ms: float | None = None,
 ):
     trace = AgentTrace(
         session_id=session_id,
@@ -102,6 +103,7 @@ async def save_agent_trace(
         rewritten_query=rewritten_query,
         sub_questions=json.dumps(sub_questions or []),
         nodes_visited=json.dumps(nodes_visited or []),
+        response_time_ms=response_time_ms,
     )
     db.add(trace)
     await db.commit()

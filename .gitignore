@@ -25,3 +25,5 @@ data/
 
 # Claude
 .claude
+
+.pytest_cache

@@ -37,9 +37,8 @@ async def test_session_and_messages(db):
 
 @pytest.mark.asyncio
 async def test_memory(db):
-    await save_memory(db, "u1", "preference", "Likes Python examples", importance=8)
-    await save_memory(db, "u1", "fact", "Works on FastAPI", importance=5)
+    await save_memory(db, "u1", "preference", "Likes Python examples")
+    await save_memory(db, "u1", "fact", "Works on FastAPI")
 
     mems = await get_user_memories(db, "u1")
     assert len(mems) == 2
-    assert mems[0].importance == 8
