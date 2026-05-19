@@ -12,8 +12,7 @@ from config import get_settings
 
 
 router = APIRouter()
- 
-UPLOAD_DIR = "./data/uploads"
+
 
 
 # ── Chat ─────────────────────────────────────────────

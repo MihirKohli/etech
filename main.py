@@ -4,6 +4,7 @@ from routes.health import router as health_router
 from db.sql_database import init_db
 from db.vector_database import get_collection, get_embeddings
 from routes.session import router as session_router
+from routes.chat import router as chat_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,4 +20,5 @@ app = FastAPI(title="LangGraph Demo", version="1.0.0", lifespan=lifespan)
 
 app.include_router(health_router)
 app.include_router(session_router)
+app.include_router(chat_router)
 
