@@ -17,6 +17,8 @@ An intelligent conversational RAG system with persistent memory, multi-agent orc
 
 ## Architecture
 
+![System Architecture](etech.jpg)
+
 ```
 User → Streamlit UI → FastAPI → LangGraph Pipeline → OpenAI GPT
                                        ↕                   ↕
@@ -347,6 +349,19 @@ Measured over a 5-turn scripted conversation (see `scripts/benchmark.py`):
 | Summary faithfulness (human eval) | ~88% |
 
 > **Note:** Latency is dominated by OpenAI API round-trips. Using a local model (Ollama + Llama 3) reduces p50 to ~400 ms at the cost of answer quality.
+
+---
+
+## Testing
+
+See [TESTING.md](TESTING.md) for full details on running tests, coverage results, and what each test module covers.
+
+```bash
+uv run python -m pytest        # run all tests with coverage
+uv run python -m pytest -v     # verbose output
+```
+
+**Current coverage: 70.5% — 48 passed, 1 skipped**
 
 ---
 
